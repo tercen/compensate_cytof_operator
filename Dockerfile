@@ -1,6 +1,6 @@
 FROM tercen/runtime-flowsuite:3.15-2
 
-RUN R -e "BiocManager::install('diffcyt')"
+RUN R -e "BiocManager::install('CATALYST')"
 RUN R -e "remotes::install_github('tercen/tim', ref = '0.0.20')"
 
 COPY . /operator
