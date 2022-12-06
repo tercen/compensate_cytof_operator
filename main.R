@@ -19,35 +19,49 @@ fset <- data %>% as_tibble() %>% bind_cols(files) %>%
 
 sce <- prepData(fset, transform = FALSE)
 
-# specify mass channels stained for & debarcode
-channels <- ctx$op.value("channels", as.character, "")
-bc_ms <- eval(parse(text = paste0("c(", channels, ")")))
-if(is.null(bc_ms)) bc_ms <- as.numeric(gsub("[^0-9.-]", "", colnames(data)))
+res <- try(ctx$labels)
 
-sce <- assignPrelim(sce, bc_ms, verbose = FALSE)
-sce <- applyCutoffs(estCutoffs(sce))
+if (class(res) == "try-error"){ 
+  #specify mass channels stained for & debarcode 
+  #example (102,103,104,105,106,108,110,113,115,120,131,133,138,139,140,141,142,143,173,174)
+  
+  channels <- ctx$op.value("channels", as.character, "")
+  bc_ms <- eval(parse(text = paste0("c(", channels, ")")))
+  if(is.null(bc_ms)) bc_ms <- as.numeric(gsub("[^0-9.-]", "", colnames(data)))
+  
+  sce <- assignPrelim(sce, bc_ms,assay = "counts", verbose = FALSE)
+  sce <- estCutoffs(sce)
+  sce <- applyCutoffs(sce,assay = "counts")
+  
+  # compute & extract spillover matrix
+  sce <- computeSpillmat(
+    sce,
+    method = "default",
+    trim = 0.5,
+    th = 1e-05
+  )
+  
+  sm <- metadata(sce)$spillover_matrix
+} else {
+  # get comp
+  doc.id <- ctx$select(ctx$labels[[1]], nr = 1)[[1]]
+  sm_df <- ctx$client$tableSchemaService$select(doc.id) %>%
+    as_tibble()%>%as.data.frame()
+  
+  rownames(sm_df) <- sm_df[,1]
+  sm_df[,1] <- NULL
+  sm <-sm_df
+  
+  metadata(sce)$spillover_matrix<-as.matrix(sm)
+}
 
-# compute & extract spillover matrix
-sce <- computeSpillmat(
-  sce,
-  method = "default",
-  trim = 0.5,
-  th = 1e-05
-)
+ sm<-as.matrix(sm)
 
-sm <- metadata(sce)$spillover_matrix
-p <- plotSpillmat(sce) 
-
-p_file <- suppressWarnings({tim::save_plot(p)})
-df_plot <- tim::plot_file_to_df(p_file) %>%
-  ctx$addNamespace() %>%
-  as_relation() 
-
-sce <- compCytof(sce, sm, method = "nnls", overwrite = FALSE)
-
+sce <- compCytof(sce,sm = sm, method ="flow" , assay = "counts", overwrite = FALSE, transform = FALSE, cofactor = 1)#"nnls" or "flow"
 df <- assay(sce, "compcounts")
 
 rids <- ctx$rselect()[1]
+
 colnames(rids) <- "channel"
 
 df_out <- df %>%
@@ -56,13 +70,7 @@ df_out <- df %>%
   mutate(.ci = as.integer(gsub("V", "", .ci)) - 1L) %>%
   left_join(rids %>% mutate(.ri = seq(1, nrow(.)) - 1L), by = "channel") %>%
   select(-channel) %>%
-  ctx$addNamespace() %>%
-  as_relation() 
-
-join_res = df_out %>%
-  left_join_relation(ctx$crelation, ".ci", ctx$crelation$rids) %>%
-  left_join_relation(df_plot, list(), list()) %>%
-  as_join_operator(ctx$cnames, ctx$cnames)
-
-join_res %>%
-  save_relation(ctx)
+  ctx$addNamespace()
+  
+  df_out %>%
+  ctx$save()

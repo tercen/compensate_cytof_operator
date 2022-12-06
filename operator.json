@@ -5,7 +5,13 @@
   "authors": ["tercen"],
   "urls": ["https://github.com/tercen/compensate_cytof_operator"],
   "container":"tercen/compensate_cytof_operator:latest",
-  "properties": []
+  "properties": [
+   {
+      "kind": "DoubleProperty",
+      "name": "channels",
+      "defaultValue": null,
+      "description": "list of the channels used the compensation by CATALYST "
+    }]
 }
 
 
