@@ -4,12 +4,12 @@
   "tags": ["data preprocessing", "cytof"],
   "authors": ["tercen"],
   "urls": ["https://github.com/tercen/compensate_cytof_operator"],
-  "container":"tercen/compensate_cytof_operator:0.0.2",
+  "container":"tercen/compensate_cytof_operator:0.0.3",
   "properties": [
    {
       "kind": "DoubleProperty",
       "name": "channels",
-      "defaultValue": null,
+      "defaultValue": "NULL",
       "description": "list of the channels used the compensation by CATALYST "
     }]
 }
