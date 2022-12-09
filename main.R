@@ -21,10 +21,7 @@ sce <- prepData(fset, transform = FALSE)
 
 res <- try(ctx$labels)
 
-if (class(res) == "try-error"){ 
-  #specify mass channels stained for & debarcode 
-  #example (102,103,104,105,106,108,110,113,115,120,131,133,138,139,140,141,142,143,173,174)
-  
+if (class(res) == "try-error"){ #specify mass channels stained for & debarcode
   channels <- ctx$op.value("channels", as.character, "")
   bc_ms <- eval(parse(text = paste0("c(", channels, ")")))
   if(is.null(bc_ms)) bc_ms <- as.numeric(gsub("[^0-9.-]", "", colnames(data)))
@@ -52,12 +49,22 @@ if (class(res) == "try-error"){
   sm_df[,1] <- NULL
   sm <-sm_df
   
+  
+  rowData(sce)$is_bc<-rowData(sce)$use_channel
+  
   metadata(sce)$spillover_matrix<-as.matrix(sm)
 }
 
- sm<-as.matrix(sm)
+sm<-as.matrix(sm)
+sm[sm>1]<-1
+p <- plotSpillmat(sce, sm = sm)
 
-sce <- compCytof(sce,sm = sm, method ="flow" , assay = "counts", overwrite = FALSE, transform = FALSE, cofactor = 1)#"nnls" or "flow"
+p_file <- suppressWarnings({tim::save_plot(p)})
+df_plot <- tim::plot_file_to_df(p_file) %>%
+  ctx$addNamespace() %>%
+  as_relation()
+
+sce <- compCytof(sce,sm = sm, method ="nnls" , assay = "counts", overwrite = FALSE, transform = FALSE, cofactor = 5)#"nnls" or "flow"
 df <- assay(sce, "compcounts")
 
 rids <- ctx$rselect()[1]
@@ -70,7 +77,14 @@ df_out <- df %>%
   mutate(.ci = as.integer(gsub("V", "", .ci)) - 1L) %>%
   left_join(rids %>% mutate(.ri = seq(1, nrow(.)) - 1L), by = "channel") %>%
   select(-channel) %>%
-  ctx$addNamespace()
-  
-  df_out %>%
-  ctx$save()
+  ctx$addNamespace() #%>%
+  as_relation()
+
+
+join_res = df_out %>%
+  left_join_relation(ctx$crelation, ".ci", ctx$crelation$rids) %>%
+  left_join_relation(df_plot, list(), list()) %>%
+  as_join_operator(ctx$cnames, ctx$cnames)
+
+ join_res %>%
+  save_relation(ctx)
