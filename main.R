@@ -77,7 +77,7 @@ df_out <- df %>%
   mutate(.ci = as.integer(gsub("V", "", .ci)) - 1L) %>%
   left_join(rids %>% mutate(.ri = seq(1, nrow(.)) - 1L), by = "channel") %>%
   select(-channel) %>%
-  ctx$addNamespace() #%>%
+  ctx$addNamespace() %>%
   as_relation()
 
 
