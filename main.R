@@ -14,6 +14,7 @@ files <- ctx$cselect() %>%
 
 fset <- data %>% as_tibble() %>% bind_cols(files) %>%
   group_by({if("filename" %in% names(.)) filename else NULL}) %>% 
+  select(.,-contains('filename'))%>% 
   group_map(~tim::matrix_to_flowFrame(as.matrix(.x))) %>%
   flowCore::flowSet()
 
