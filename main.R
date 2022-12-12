@@ -10,11 +10,11 @@ data <- ctx$as.matrix() %>% t()
 colnames(data) <- ctx$rselect()[[1]]
 
 files <- ctx$cselect() %>% 
-  select(contains("filename"))
+  select(contains("Barcodes "))
 
 fset <- data %>% as_tibble() %>% bind_cols(files) %>%
-  group_by({if("filename" %in% names(.)) filename else NULL}) %>% 
-  select(.,-contains('filename'))%>% 
+  group_by({if("Barcodes " %in% names(.)) filename else NULL}) %>% 
+  select(.,-contains('Barcodes'))%>% 
   group_map(~tim::matrix_to_flowFrame(as.matrix(.x))) %>%
   flowCore::flowSet()
 
@@ -50,7 +50,6 @@ if (class(res) == "try-error"){ #specify mass channels stained for & debarcode
   sm_df[,1] <- NULL
   sm <-sm_df
   
-  
   rowData(sce)$is_bc<-rowData(sce)$use_channel
   
   metadata(sce)$spillover_matrix<-as.matrix(sm)
@@ -65,27 +64,27 @@ df_plot <- tim::plot_file_to_df(p_file) %>%
   ctx$addNamespace() %>%
   as_relation()
 
-sce <- compCytof(sce,sm = sm, method ="nnls" , assay = "counts", overwrite = FALSE, transform = FALSE, cofactor = 5)#"nnls" or "flow"
-df <- assay(sce, "compcounts")
+sce.comp <- compCytof(sce,sm = sm, method ="nnls" , assay = "counts", overwrite = FALSE, transform = FALSE, cofactor = 5)#"nnls" or "flow"
+df <- assay(sce.comp, "compcounts")
 
 rids <- ctx$rselect()[1]
 
-colnames(rids) <- "channel"
+colnames(rids) <- "variable"
 
 df_out <- df %>%
-  as_tibble(rownames = "channel") %>%
-  tidyr::pivot_longer(cols = !contains("channel"), names_to = ".ci") %>%
-  mutate(.ci = as.integer(gsub("V", "", .ci)) - 1L) %>%
-  left_join(rids %>% mutate(.ri = seq(1, nrow(.)) - 1L), by = "channel") %>%
-  select(-channel) %>%
+  as_tibble(rownames = "variable") %>%
+  tidyr::pivot_longer(cols = !contains("variable"), names_to = ".ri") %>%
+  mutate(.ri = as.integer(gsub("V", "", .ri)) - 1L) %>%
+  left_join(rids %>% mutate(.ci = seq(1, nrow(.)) - 1L), by = "variable") %>%
+  #select(-channel) %>%
   ctx$addNamespace() %>%
   as_relation()
 
 
 join_res = df_out %>%
-  left_join_relation(ctx$crelation, ".ci", ctx$crelation$rids) %>%
+  left_join_relation(ctx$crelation, ".ri", ctx$crelation$rids) %>%
   left_join_relation(df_plot, list(), list()) %>%
   as_join_operator(ctx$cnames, ctx$cnames)
 
- join_res %>%
+join_res %>%
   save_relation(ctx)
